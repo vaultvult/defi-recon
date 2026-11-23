@@ -1,66 +1,59 @@
-## Foundry
+# DeFi Recon Notes
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
+Two protocols, two sessions, both negative. Published because the method transfers even when the targets don't, and because "we looked and found nothing" is data.
 
-Foundry consists of:
+| Target | Chain | Outcome | Session |
+|---|---|---|---|
+| Pool Party V2 | Arbitrum / Robinhood Chain | No bug. 1.62% round-trip fee wall measured. | 1 |
+| RNT Lend | Polygon | No bug reachable without admin rights. $55.5k stranded in aUSDC. | 2 |
 
-- **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
-- **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
-- **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
-- **Chisel**: Fast, utilitarian, and verbose solidity REPL.
+## Why publish negatives
 
-## Documentation
+Most recon writeups only appear when something was found, so the field looks denser than it is. Two clean misses with the full reasoning attached are more useful than a third exploit thread, because they document *where the seams aren't*.
 
-https://book.getfoundry.sh/
+Both writeups include the dead ends deliberately.
 
-## Usage
+## Pool Party V2 — summary
 
-### Build
+V2 alpha is on Arbitrum (hub) and Robinhood Chain (spoke). Base is where V1 was exploited; do not confuse them.
 
-```shell
-$ forge build
-```
+- 11 funds enumerated via `fundByNumber(uint256)` on the factory, ~$40 total TVL. Fund 7 (`0xa653F620EA8F5539Ed4bB55bE2977262FBa1F2dC`) selected at $19.15 NAV.
+- Fee reality: the 12% wall is the protocol maximum. Fund 7 actually charges `flowFeeBps` 25 and `payoutFeeBps` 100 — 1.5% round trip.
+- Dry drain on a Foundry fork measured **1.62% loss** on a $1 round trip. The fund pays out, it just costs more than it returns at that size.
+- **Instant payouts settle inside `requestPayout`.** `claimPayout` only applies to `PayoutMode.Standard` and reverts `NoOpenPayoutRequest(address)` otherwise.
+- Every NAV entry is token-backed and every rounding favours the fund. No mint-free path through deposit, payout, income-index or transit.
+- Only survivor: a cents-scale JIT spoke-income leak (S-15), uneconomic below ~$1k.
 
-### Test
+Full writeup: [docs/pool-party-v2.md](docs/pool-party-v2.md)
 
-```shell
-$ forge test
-```
+## RNT Lend — summary
 
-### Format
+Aave V3.0.0 fork on Polygon, 108 reserves, $21M TVL at selection. Already drained $954,703 on 18 Nov 2026 by an admin swapping both stablecoin aToken proxies to a contract with a permissionless pull.
 
-```shell
-$ forge fmt
-```
+Oracle layer, fully mapped and hardened:
 
-### Gas Snapshots
+- Every reserve has its own aggregator, its own 837-byte proxy, and its own implementation — Chainlink `EACAggregatorProxy` shape with OCR `transmit` writes.
+- 308-byte read-only stub implementations on the placeholder feeds; 9,571-byte `Ownable` implementations on the live ones.
+- `RDO-6` serves a flat `1e20` at 18 decimals with `updatedAt 0` and `roundId 0` — never pushed, and the pool accepts it without a freshness check.
+- Live feeds serve `~1.0897e20` on a moving external index over a static `1e20` phase base. The base is not the price.
 
-```shell
-$ forge snapshot
-```
+aToken layer, closed:
 
-### Anvil
+- Both aToken proxies share implementation `0x7175160bfc3ab87f6248b97a3ca6ed6c2eab6e88`. EIP-1967 admin slot is `0x0`; no `upgradeTo` in the selector list.
+- Full dispatch mapped (`0x1a`–`0x205`). No custom entry point. `0x18c39f17`, `0x7be53ca1`, `0x31873e2e` are all outbound call selectors, not functions.
+- `rescueTokens` from an unprivileged EOA reverts `"1"` (`CALLER_NOT_POOL_ADMIN`, Aave V3.0.0 numeric error-string style). `ATOKEN_REVISION` is `1`.
+- 55,529.636311 USDC still sits in aUSDC against 1,952,324 aUSDC supply — **$0.0284 of backing per aToken**. Remaining outflow paths are `onlyPool` or `onlyPoolAdmin`.
 
-```shell
-$ anvil
-```
+Full writeup: [docs/rnt-lend.md](docs/rnt-lend.md)
 
-### Deploy
+## Method
 
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
-```
+The reusable part. [method/recon-chain.md](method/recon-chain.md)
 
-### Cast
+Provider → data provider → reserve enumeration → `getSourceOfAsset` → per-asset feed → EIP-1967 slot → implementation → selector dump → `cast 4byte` → guard trace. Roughly twenty minutes to replay on any Aave fork.
 
-```shell
-$ cast <subcommand>
-```
+## Tooling
 
-### Help
+`cast` only: `call`, `code`, `codehash`, `codesize`, `storage`, `disassemble`, `4byte`, `block-number`, `wallet`. Foundry for fork rehearsal. No explorer API — Blockscout returned HTML and Alchemy's free tier caps `eth_getLogs` at 10 blocks, so everything here is `eth_call` and `eth_getStorageAt`.
 
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
-```
+## Layout

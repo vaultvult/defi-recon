@@ -1,5 +1,6 @@
 .env
+*.hex
 out/
 cache/
-broadcast/
 lib/
+broadcast/
