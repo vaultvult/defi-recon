@@ -9,7 +9,7 @@ Two protocols, two sessions, both negative. Published because the method transfe
 
 ## Why publish negatives
 
-Most recon writeups only appear when something was found, so the field looks denser than it is. Two clean misses with the full reasoning attached are more useful than a third exploit thread, because they document *where the seams aren't*.
+Most recon writeups only appear when something was found, so the field looks denser than it is. Two clean misses with the full reasoning attached are more useful than a third exploit thread, because they document where the seams aren't.
 
 Both writeups include the dead ends deliberately.
 
@@ -48,12 +48,25 @@ Full writeup: [docs/rnt-lend.md](docs/rnt-lend.md)
 
 ## Method
 
-The reusable part. [method/recon-chain.md](method/recon-chain.md)
+The reusable part: [method/recon-chain.md](method/recon-chain.md)
 
-Provider → data provider → reserve enumeration → `getSourceOfAsset` → per-asset feed → EIP-1967 slot → implementation → selector dump → `cast 4byte` → guard trace. Roughly twenty minutes to replay on any Aave fork.
+Provider, data provider, reserve enumeration, `getSourceOfAsset`, per-asset feed, EIP-1967 slot, implementation, selector dump, `cast 4byte`, guard trace. Roughly twenty minutes to replay on any Aave fork.
 
 ## Tooling
 
 `cast` only: `call`, `code`, `codehash`, `codesize`, `storage`, `disassemble`, `4byte`, `block-number`, `wallet`. Foundry for fork rehearsal. No explorer API — Blockscout returned HTML and Alchemy's free tier caps `eth_getLogs` at 10 blocks, so everything here is `eth_call` and `eth_getStorageAt`.
 
 ## Layout
+
+    docs/      per-target writeups
+    method/    reusable recon chain
+    opsec/     burner wallet and key handling
+    recon/     raw captures, fund maps, selector dumps
+
+## Caveats
+
+Personal notes, unaudited, correct as of 2026-11-23. Fork rehearsal only — nothing here was executed against mainnet. Fee and price figures are point-in-time and move.
+
+## Licence
+
+MIT.
