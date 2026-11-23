@@ -1,0 +1,5 @@
+block: 
+nextCreationNumber: 
+fund7 totalSupply: 19000000000000000000 [1.9e19]
+fund7 USDC at core: 5889669 [5.889e6]
+payoutLogic codehash: 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470
